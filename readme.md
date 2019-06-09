@@ -1,0 +1,1 @@
+springboot与redis的搭建测试环境可用

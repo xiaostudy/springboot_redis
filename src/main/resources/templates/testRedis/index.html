@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+
+<head>
+    <title>首页</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=8">
+    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-control" content="no-cache">
+    <meta http-equiv="Cache" content="no-cache">
+
+    <script src="" th:src="@{/statics/js/jquery-3.0.0.js}"></script>
+    <!--jqueryui-->
+    <link href="//cdn.bootcss.com/jqueryui/1.12.0-rc.2/jquery-ui.min.css" th:href="@{/statics/jquery-ui-1.12.0-rc.2/jquery-ui.min.css}" rel="stylesheet">
+    <!--jqgrid的css-->
+    <link href="//cdn.bootcss.com/jqgrid/4.6.0/css/ui.jqgrid.css" th:href="@{/statics/jquery.jqGrid-4.6.0/css/ui.jqgrid.css}" rel="stylesheet">
+
+    <!--locale-->
+    <script src="//cdn.bootcss.com/jqgrid/4.6.0/js/i18n/grid.locale-en.js" th:src="@{/statics/jquery.jqGrid-4.6.0/js/i18n/grid.locale-en.js}"></script>
+    <!--jqgrid的js-->
+    <script src="//cdn.bootcss.com/jqgrid/4.6.0/js/jquery.jqGrid.min.js" th:src="@{/statics/jquery.jqGrid-4.6.0/js/jquery.jqGrid.min.js}"></script>
+    <link href="" th:href="@{/statics/layui/css/layui.css}" rel="stylesheet">
+    <script src="" th:src="@{/statics/layui/layui.all.js}"></script>
+</head>
+<body>
+<h1>测试redis</h1>
+<hr>
+<shiro:hasPermission name="vip">
+    <button type="button" class="layui-btn" title="添加" onclick="create()">添加</button>
+</shiro:hasPermission>
+<shiro:hasPermission name="vip">
+    <input type="hidden" id="vip">
+</shiro:hasPermission>
+<shiro:hasPermission name="svip">
+    <input type="hidden" id="svip">
+</shiro:hasPermission>
+<table id="jqGrid" class="layui-table layui-table-grid"></table>
+<div id="jqGridPager"></div>
+</body>
+</html>
+
+
+<script>
+    $(function () {
+        $("#jqGrid").jqGrid({
+            url : '[[${#httpServletRequest.getContextPath()}]]/testRedis/pages',
+            datatype : "json",
+            colModel : [
+                { label: 'ID', name: 'id', width: 80, hidden:true },
+                { label: "名称", name: "name", "align": "center",  width: 100},
+                { label: "密码 ", name: "password", "align": "center", width: 100},
+                { label: "操作 ", name: "id", "align": "center", width: 100, formatter: operation}
+            ],
+            viewrecords : true,
+            height : 300,
+            rowNum : 5,
+            rowList : [5,10,15,20,30,50],
+            rownumbers : true,
+            rownumWidth : 35,
+            autowidth : true,
+            multiselect : true,
+            pager : "#jqGridPager",
+            jsonReader : {
+                root : "redisEntityList",
+                page : "current",
+                total : "pages",
+                records : "total"
+            },
+            prmNames : {
+                page : "page",
+                rows : "rows",
+                order : "order"
+            },
+            postData:{
+
+            },
+            gridComplete : function() {
+                // 隐藏grid底部滚动条
+                $("#jqGrid").closest(".ui-jqgrid-bdiv").css({
+                    "overflow-x" : "hidden"
+                });
+                //设置行高
+                var grid = $("#jqGrid");
+                var ids = grid.getDataIDs();
+                for (var i = 0; i < ids.length; i++) {
+                    grid.setRowData ( ids[i], false, {height: 10} );
+                }
+            },
+            beforeRequest : function (){
+                var current=$(this).getGridParam("page");//当前页
+                var total= $(this).getGridParam('lastpage'); //获取总页数
+                if(current > total && total!=0){
+                    //设置页码为最后一页 并重新加载
+                    var postDatas = $(this).jqGrid("getGridParam", "postData");
+                    postDatas['page']=total;
+                    $(this).setGridParam({postData:postDatas});
+                }
+            },
+            ondblClickRow : function(rowid) {
+                view(rowid);
+                /*if(!ondblClickRowSubTable){
+                    archivesFolderJs.view(rowid);
+                }else{
+                    ondblClickRowSubTable = false;
+                }*/
+            }
+        });
+
+        function operation(id) {
+            /*var hrml2 =
+                ' <div class="layui-btn-group">' +
+                '                    <button type="button" class="layui-btn" title="查看" onclick="view(\''+id+'\')">查看</button>' +
+                '                    <button type="button" class="layui-btn" title="编辑" onclick="update(\''+id+'\')">编辑</button>' +
+                '                    <button type="button" class="layui-btn" title="删除" onclick="deleteById(\''+id+'\')">删除</button>';*/
+            var hrml2 =
+                ' <div class="layui-btn-group">' +
+                '                    <button type="button" class="layui-btn" title="查看" onclick="view(\''+id+'\')">查看</button>';
+            if($("#vip").length>0) {
+                hrml2 = hrml2  + '<button type="button" class="layui-btn" title="编辑" onclick="update(\''+id+'\')">编辑</button>'
+                    + '<button type="button" class="layui-btn" title="删除" onclick="deleteById(\''+id+'\')">删除</button>';
+            }
+            return hrml2;
+        }
+    });
+    
+    function create() {
+        var content = "[[${#httpServletRequest.getContextPath()}]]/testRedis/form";
+
+        var title ="添加";
+        var btns = [ '确认',  '关闭' ];
+        var width ='700px';
+        var height = '200px';
+        var operation = "add";
+        open(2, title, width, height, 0.5, false, content, btns, operation, "");
+    }
+
+    function view(id) {
+        var content = "[[${#httpServletRequest.getContextPath()}]]/testRedis/form";
+
+        var title ="查看";
+        var btns = [ '关闭' ];
+        var width ='700px';
+        var height = '200px';
+        var operation = "view";
+        open(2, title, width, height, 0.5, false, content, btns, operation, id);
+    }
+
+    function update(id) {
+        var content = "[[${#httpServletRequest.getContextPath()}]]/testRedis/form";
+
+        var title ="修改";
+        var btns = [ '确认',  '关闭' ];
+        var width ='700px';
+        var height = '200px';
+        var operation = "update";
+        open(2, title, width, height, 0.5, false, content, btns, operation, id);
+    }
+
+    function deleteById(id) {
+        var content = "[[${#httpServletRequest.getContextPath()}]]/testRedis/form";
+
+        layer.confirm('确认删除？', {
+            btn: ['确定','取消'] //按钮
+        }, function(){
+            $.get("[[${#httpServletRequest.getContextPath()}]]/testRedis/deleteById?id=" + id
+                + "&_=" + new Date().getTime(), function (r) {
+                layer.closeAll();
+                if(r.result == 1) {
+                    layui.layer.msg("删除成功");
+                    $("#jqGrid").jqGrid().trigger("reloadGrid");
+                } else {
+                    layui.layer.msg("删除失败");
+                }
+            });
+        }, function(){
+            // 点击取消事件
+        });
+    }
+
+    function open(type, title, width, height, shade, maxmin, content, btns, operation, id) {
+        layui.use('layer', function() {
+            var layer = layui.layer;
+            parent.layer.open({
+                type: type,
+                title: title,
+                area: [width, height],
+                shade: shade,
+                maxmin: maxmin,
+                content: content,
+                btn: btns,
+                yes: function (index, layero) {
+                    var selector = layero["selector"];
+                    selector = "#layui-layer-iframe" + selector.substring("#layui-layer".length, selector.length);
+                    var name = parent.$(selector).contents().find("#name").val();
+                    var password = parent.$(selector).contents().find("#password").val();
+                    if(undefined == name || null == name || "" == name) {
+                        layui.layer.msg("请输入名称");
+                        return;
+                    }
+                    if(undefined == password || null == password || "" == password) {
+                        layui.layer.msg("请输入密码");
+                        return;
+                    }
+                    if("add" == operation) {
+                        $.get("[[${#httpServletRequest.getContextPath()}]]/testRedis/getByName?name=" + name
+                            + "&_=" + new Date().getTime(), function (r) {
+                            if(null != r.redisEntity && r.redisEntity.name == name) {
+                                layui.layer.msg("名称已存在");
+                                return;
+                            } else {
+                                $.get("[[${#httpServletRequest.getContextPath()}]]/testRedis/insert?name=" + name
+                                    + "&password=" + password + "&_=" + new Date().getTime(), function (r) {
+                                    if(r.result == 1) {
+                                        layer.closeAll();
+                                        layui.layer.msg("添加成功");
+                                        $("#jqGrid").jqGrid().trigger("reloadGrid");
+                                    } else {
+                                        layui.layer.msg("添加失败");
+                                    }
+                                });
+                            }
+                        });
+                    } else if("update" == operation) {
+                        $.get("[[${#httpServletRequest.getContextPath()}]]/testRedis/update?id=" + id + "&name=" + name
+                            + "&password=" + password + "&_=" + new Date().getTime(), function (r) {
+                            if(r.result == 1) {
+                                layer.closeAll();
+                                layui.layer.msg("修改成功");
+                                $("#jqGrid").jqGrid().trigger("reloadGrid");
+                            } else {
+                                layui.layer.msg("修改失败");
+                            }
+                        });
+                    } else {
+                        layer.closeAll();
+                    }
+                },
+
+                btn3: function () {
+                    parent.layer.closeAll();
+                    return false;
+                },
+                zIndex: 999,
+                success: function (layero) {
+                    // 弹出窗弹出之前设置数据到弹出窗页面
+                    if("update" == operation) {
+                        var selector = layero["selector"];
+                        selector = "#layui-layer-iframe" + selector.substring("#layui-layer".length, selector.length);
+                        parent.$(selector).contents().find("#id").val(id);
+                        var rowData = $("#jqGrid").jqGrid('getRowData',id);
+                        parent.$(selector).contents().find("#name").val(rowData.name);
+                        parent.$(selector).contents().find("#password").val(rowData.password);
+                    } else if("view" == operation) {
+                        var selector = layero["selector"];
+                        selector = "#layui-layer-iframe" + selector.substring("#layui-layer".length, selector.length);
+                        parent.$(selector).contents().find("#id").val(id);
+                        var rowData = $("#jqGrid").jqGrid('getRowData',id);
+                        var name = parent.$(selector).contents().find("#name");
+                        name.val(rowData.name);
+                        var password = parent.$(selector).contents().find("#password");
+                        password.val(rowData.password);
+                        name.attr("onfocus", "this.blur()");
+                        password.attr("onfocus", "this.blur()");
+                        name.css("background", "#CCCCCC");
+                        name.css("cursor", "not-allowed");
+                        password.css("background", "#CCCCCC");
+                        password.css("cursor", "not-allowed");
+                        /*name.attr("disabled", "disabled");
+                        password.attr("disabled", "disabled");*/
+                    }
+                }
+            });
+        });
+    }
+</script>
